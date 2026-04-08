@@ -68,6 +68,74 @@ var _CATID_FIRSTID = (function () {
     return map;
 }());
 
+// ── Language preference ────────────────────────────────────
+var LangPref_LSN = 'lang_pref@$111';
+
+// ── Malayalam book names ───────────────────────────────────
+var _BOOK_NAMES_ML = {
+    0:'ഉല്‍പത്തി',       1:'പുറപ്പാട്',        2:'ലേവ്യർ',
+    3:'സംഖ്യ',           4:'നിയമാവർത്തനം',      5:'ജോഷ്വാ',
+    6:'ന്യായാധിപന്മാർ',  7:'റൂത്ത്',            8:'1 സാമുവൽ',
+    9:'2 സാമുവൽ',        10:'1 രാജാക്കന്മാർ',   11:'2 രാജാക്കന്മാർ',
+    12:'1 ദിനവൃത്താന്തം',13:'2 ദിനവൃത്താന്തം',  14:'എസ്രാ',
+    15:'നെഹമിയ',          16:'തോബിത്',           17:'യൂദിത്ത്',
+    18:'എസ്തേർ',          19:'1 മക്കബായർ',       20:'2 മക്കബായർ',
+    21:'ജോബ്',            22:'സങ്കീർത്തനങ്ങൾ',   23:'സുഭാഷിതങ്ങൾ',
+    24:'സഭാപ്രസംഗകൻ',     25:'ഉത്തമഗീതം',        26:'ജ്ഞാനം',
+    27:'പ്രഭാഷകൻ',        28:'ഏശയ്യാ',            29:'ജെറെമിയ',
+    30:'വിലാപങ്ങൾ',       31:'ബാറൂക്ക്',          32:'എസെക്കിയേൽ',
+    33:'ദാനിയേൽ',          34:'ഹോസിയാ',           35:'ജോയേൽ',
+    36:'ആമോസ്',            37:'ഒബാദിയ',            38:'യോനാ',
+    39:'മിക്കാ',           40:'നാഹും',              41:'ഹബക്കുക്ക്',
+    42:'സെഫാനിയ',          43:'ഹഗ്ഗായി',            44:'സഖറിയാ',
+    45:'മലാക്കി',
+    46:'മത്തായി',          47:'മർകോസ്',             48:'ലൂക്കാ',
+    49:'യോഹന്നാൻ',          50:'അപ്പ. പ്രവർത്തനങ്ങൾ', 51:'റോമാ',
+    52:'1 കൊറിന്തോസ്',     53:'2 കൊറിന്തോസ്',       54:'ഗലാത്തിയാ',
+    55:'എഫേസോസ്',           56:'ഫിലിപ്പി',            57:'കൊളോസോസ്',
+    58:'1 തെസലോനിക്കാ',    59:'2 തെസലോനിക്കാ',      60:'1 തിമോത്തേയോസ്',
+    61:'2 തിമോത്തേയോസ്',   62:'തീത്തോസ്',            63:'ഫിലെമോൻ',
+    64:'ഹെബ്രായർ',          65:'യാക്കോബ്',            66:'1 പത്രോസ്',
+    67:'2 പത്രോസ്',         68:'1 യോഹന്നാൻ',          69:'2 യോഹന്നാൻ',
+    70:'3 യോഹന്നാൻ',         71:'യൂദാസ്',              72:'വെളിപാട്'
+};
+
+// Helper — get book display name per catid (used in toasts)
+function getBookDisplayName(catid) {
+    var lang = document.body.dataset.lang || 'both';
+    var ml = _BOOK_NAMES_ML[catid] || '';
+    var en = _BOOK_NAMES[catid]    || '';
+    if (lang === 'ml') return ml || en;
+    if (lang === 'en') return en || ml;
+    return (ml && en) ? ml + ' / ' + en : (ml || en);
+}
+
+// Helper — create a bilingual <span> node for a book name
+function _makeBilingualSpan(catid, suffix) {
+    var ml = _BOOK_NAMES_ML[catid] || '';
+    var en = _BOOK_NAMES[catid]    || '';
+    suffix = suffix || '';
+
+    var wrap = document.createElement('span');
+
+    var mlSpan = document.createElement('span');
+    mlSpan.className   = 'lang-ml';
+    mlSpan.textContent = ml + suffix;
+
+    var sep = document.createElement('span');
+    sep.className   = 'lang-sep';
+    sep.textContent = ' / ';
+
+    var enSpan = document.createElement('span');
+    enSpan.className   = 'lang-en';
+    enSpan.textContent = en + suffix;
+
+    wrap.appendChild(mlSpan);
+    wrap.appendChild(sep);
+    wrap.appendChild(enSpan);
+    return wrap;
+}
+
 // ── English book names for plan display ───────────────────
 var _BOOK_NAMES = {
     0:'Genesis',         1:'Exodus',          2:'Leviticus',       3:'Numbers',
@@ -378,7 +446,70 @@ function buildCheckedMap() {
     return map;
 }
 
-// Count total/read chapters for one plan day (uses a pre-built map for efficiency)
+// ==========================================================
+//  Sibling-chapter support (e.g. Esther duplicate chapters)
+//  Siblings share the same catid + val (chapter number) but
+//  have different storage IDs — e.g. Greek additions.
+// ==========================================================
+var _SIBLING_MAP    = null; // chapterId → [siblingId, ...]
+var _CHAPTER_PRIMARY = null; // chapterId → primaryId (the one the plan uses)
+
+function _buildSiblingMap() {
+    _SIBLING_MAP    = {};
+    _CHAPTER_PRIMARY = {};
+    var all = GetLocalStorage(OldChapters).concat(GetLocalStorage(NewChapters));
+    var groups = {}; // "catid_val" → [id, ...]
+    for (var i = 0; i < all.length; i++) {
+        var key = all[i].catid + '_' + all[i].val;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(all[i].id);
+    }
+    for (var k in groups) {
+        var ids = groups[k];
+        // Primary ID = what getChapterId returns (metadata-driven, matches plan checkboxes)
+        var parts   = k.split('_');
+        var primary = getChapterId(parseInt(parts[0], 10), parseInt(parts[1], 10));
+        if (primary === null) primary = ids[0];
+        for (var j = 0; j < ids.length; j++) {
+            _CHAPTER_PRIMARY[ids[j]] = primary;
+            if (ids.length < 2) continue;
+            var siblings = [];
+            for (var m = 0; m < ids.length; m++) { if (m !== j) siblings.push(ids[m]); }
+            _SIBLING_MAP[ids[j]] = siblings;
+        }
+    }
+}
+
+function getSiblingIds(chapterId) {
+    if (!_SIBLING_MAP) _buildSiblingMap();
+    return _SIBLING_MAP[chapterId] || [];
+}
+
+// Returns the plan-side ID for a chapter (primary metadata ID)
+function getPrimaryChapterId(chapterId) {
+    if (!_CHAPTER_PRIMARY) _buildSiblingMap();
+    var p = _CHAPTER_PRIMARY[chapterId];
+    return p !== undefined ? p : chapterId;
+}
+
+// ==========================================================
+//  Distinct chapter stats — counts unique (catid, val) pairs
+//  so duplicate chapters (e.g. Esther Greek additions) are
+//  only counted once in totals and progress.
+// ==========================================================
+function _distinctStats(chapters) {
+    var seenTot = {}, seenRead = {}, total = 0, read = 0;
+    for (var i = 0; i < chapters.length; i++) {
+        var key = chapters[i].catid + '_' + chapters[i].val;
+        if (!seenTot[key]) { seenTot[key] = true; total++; }
+        if (chapters[i].sel === 1 && !seenRead[key]) { seenRead[key] = true; read++; }
+    }
+    return { total: total, read: read };
+}
+
+// Count total/read chapters for one plan day (uses a pre-built map for efficiency).
+// For chapters that have siblings (e.g. Esther), all OT copies must be read
+// before the chapter counts as read in the plan.
 function getDayStats(dayIndex, checkedMap) {
     var segments = PLAN_100[dayIndex];
     if (!segments || segments.length === 0) return { total: 0, read: 0 };
@@ -389,7 +520,15 @@ function getDayStats(dayIndex, checkedMap) {
             var id = getChapterId(seg[0], ch);
             if (id !== null) {
                 total++;
-                if (checkedMap[id]) read++;
+                if (checkedMap[id]) {
+                    // If this chapter has sibling copies, all must also be checked
+                    var sibs = getSiblingIds(id);
+                    var allRead = true;
+                    for (var si = 0; si < sibs.length; si++) {
+                        if (!checkedMap[sibs[si]]) { allRead = false; break; }
+                    }
+                    if (allRead) read++;
+                }
             }
         }
     }
@@ -462,8 +601,19 @@ function AlertMessage(msgType, message) {
 // ==========================================================
 function updateBookItemStatus(bookItem) {
     var allBoxes = bookItem.querySelectorAll('input[type=checkbox]');
-    var total = allBoxes.length, checked = 0;
-    for (var i = 0; i < allBoxes.length; i++) { if (allBoxes[i].checked) checked++; }
+
+    // Group by displayed chapter number to handle duplicate chapters (e.g. Esther).
+    // A chapter is "read" if ANY of its duplicate entries is checked.
+    var groups = {}; // chapterNumber → anyChecked
+    for (var i = 0; i < allBoxes.length; i++) {
+        var box = allBoxes[i].nextElementSibling;
+        var chNum = box ? box.textContent.trim() : String(i);
+        if (!(chNum in groups)) groups[chNum] = false;
+        if (allBoxes[i].checked) groups[chNum] = true;
+    }
+
+    var total = 0, checked = 0;
+    for (var n in groups) { total++; if (groups[n]) checked++; }
 
     var badge = document.getElementById('badge-' + bookItem.dataset.catid);
     if (badge) badge.textContent = checked + '/' + total;
@@ -522,26 +672,32 @@ function BindDashboard() {
     var otBooks    = GetLocalStorage(OldTestament_LSN);
     var ntBooks    = GetLocalStorage(NewTestament_LSN);
 
-    var otTotal = otChapters.length, otRead = 0;
-    for (var i = 0; i < otChapters.length; i++) { if (otChapters[i].sel === 1) otRead++; }
-
-    var ntTotal = ntChapters.length, ntRead = 0;
-    for (var j = 0; j < ntChapters.length; j++) { if (ntChapters[j].sel === 1) ntRead++; }
-
+    // Use distinct (catid, val) counts so duplicate chapters (e.g. Esther) are not double-counted
+    var otStats = _distinctStats(otChapters);
+    var ntStats = _distinctStats(ntChapters);
+    var otTotal = otStats.total, otRead = otStats.read;
+    var ntTotal = ntStats.total, ntRead = ntStats.read;
     var total = otTotal + ntTotal, totalRead = otRead + ntRead;
 
     // Fully-completed books
     var booksTotal = otBooks.length + ntBooks.length, booksComplete = 0;
     function countBooks(books, chapters) {
         for (var k = 0; k < books.length; k++) {
-            var catid = books[k].id, all = true, found = false;
+            var catid = books[k].id;
+            // Build distinct-val map for this book: val → anyRead
+            var valRead = {}, valFound = false;
             for (var c = 0; c < chapters.length; c++) {
-                if (chapters[c].catid === catid) {
-                    found = true;
-                    if (chapters[c].sel !== 1) { all = false; break; }
-                }
+                if (chapters[c].catid !== catid) continue;
+                valFound = true;
+                var v = chapters[c].val;
+                if (!(v in valRead)) valRead[v] = false;
+                if (chapters[c].sel === 1) valRead[v] = true;
             }
-            if (found && all) booksComplete++;
+            if (!valFound) continue;
+            // Complete only if every distinct chapter number has been read
+            var bookDone = true;
+            for (var v2 in valRead) { if (!valRead[v2]) { bookDone = false; break; } }
+            if (bookDone) booksComplete++;
         }
     }
     countBooks(otBooks, otChapters);
@@ -618,8 +774,23 @@ function BindAccordion(containerId, categoryData, itemData, attrId) {
         header.setAttribute('aria-controls', 'panel-' + catid);
 
         var nameSpan = document.createElement('span');
-        nameSpan.className   = 'book-name';
-        nameSpan.textContent = cat.val;
+        nameSpan.className = 'book-name';
+
+        var _mlN = document.createElement('span');
+        _mlN.className   = 'lang-ml';
+        _mlN.textContent = _BOOK_NAMES_ML[catid] || cat.val;
+
+        var _sepN = document.createElement('span');
+        _sepN.className   = 'lang-sep';
+        _sepN.textContent = ' / ';
+
+        var _enN = document.createElement('span');
+        _enN.className   = 'lang-en';
+        _enN.textContent = _BOOK_NAMES[catid] || cat.val;
+
+        nameSpan.appendChild(_mlN);
+        nameSpan.appendChild(_sepN);
+        nameSpan.appendChild(_enN);
 
         var badge = document.createElement('span');
         badge.className   = 'book-badge';
@@ -688,21 +859,50 @@ function BindCheckBoxClick(containerId, attrId) {
 
         updateBookItemStatus(bookItem);
 
-        // Sync to plan view
-        var chId = parseInt(inp.value, 10);
-        syncCheckboxes(chId, inp.checked, inp);
+        var chId     = parseInt(inp.value, 10);
+        var siblings = getSiblingIds(chId);
 
-        // Update plan day card headers that contain this chapter
-        var planDays = findPlanDaysForChapter(chId);
-        var map = buildCheckedMap();
-        for (var pd = 0; pd < planDays.length; pd++) {
-            var dayCard = document.querySelector('.plan-day[data-day="' + planDays[pd] + '"]');
-            if (dayCard) updatePlanDayCard(planDays[pd], dayCard, map);
+        if (siblings.length > 0) {
+            // ── Sibling chapter (e.g. Esther duplicate) ─────────────
+            // OT copies are INDEPENDENT — do NOT auto-check the other copy.
+            // Plan marks chapter as read only when ALL OT copies are checked.
+            var freshMap   = buildCheckedMap();
+            var allIds     = [chId].concat(siblings);
+            var mergedRead = true;
+            for (var si = 0; si < allIds.length; si++) {
+                if (!freshMap[allIds[si]]) { mergedRead = false; break; }
+            }
+            var primaryId = getPrimaryChapterId(chId);
+            // Push merged state to plan checkboxes ONLY — scoped to #plan-list
+            // to avoid accidentally checking the OT primary accordion checkbox.
+            var planList  = document.getElementById('plan-list');
+            var planBoxes = planList ? planList.querySelectorAll('input[type=checkbox][value="' + primaryId + '"]') : [];
+            for (var pi = 0; pi < planBoxes.length; pi++) {
+                if (planBoxes[pi].checked !== mergedRead) {
+                    planBoxes[pi].checked = mergedRead;
+                }
+            }
+            // Refresh plan day card(s) containing this chapter
+            var planDays = findPlanDaysForChapter(primaryId);
+            for (var pd = 0; pd < planDays.length; pd++) {
+                var planDayCard = document.querySelector('.plan-day[data-day="' + planDays[pd] + '"]');
+                if (planDayCard) updatePlanDayCard(planDays[pd], planDayCard, freshMap);
+            }
+        } else {
+            // ── Normal (non-sibling) chapter ─────────────────────────
+            syncCheckboxes(chId, inp.checked, inp);
+            var map       = buildCheckedMap();
+            var planDays2 = findPlanDaysForChapter(chId);
+            for (var pd2 = 0; pd2 < planDays2.length; pd2++) {
+                var planDayCard2 = document.querySelector('.plan-day[data-day="' + planDays2[pd2] + '"]');
+                if (planDayCard2) updatePlanDayCard(planDays2[pd2], planDayCard2, map);
+            }
         }
 
         // Toast
-        var bookName  = (bookItem.querySelector('.book-name') || {}).textContent || '';
-        var chLabel   = inp.nextElementSibling ? inp.nextElementSibling.textContent : '';
+        var toastCatid = parseInt(bookItem.dataset.catid, 10);
+        var bookName   = getBookDisplayName(toastCatid);
+        var chLabel    = inp.nextElementSibling ? inp.nextElementSibling.textContent : '';
         AlertMessage(inp.checked ? 'Success' : 'Info',
             bookName + ' — Ch.' + chLabel + (inp.checked ? ' marked as read.' : ' unmarked.'));
     });
@@ -756,7 +956,7 @@ function BindPlan() {
         else if (stats.read > 0)                             statusClass = 'day-partial';
 
         // Summary line  e.g. "Genesis 1-5 • Psalms 1-3 • Matthew 1-2"
-        var summary = isRestDay ? 'Day of Rest & Reflection' : _makeDaySummary(segments);
+        var summaryObj = isRestDay ? null : _makeDaySummary(segments);
 
         var dayCard = document.createElement('div');
         dayCard.className  = 'plan-day' + (statusClass ? ' ' + statusClass : '');
@@ -773,8 +973,23 @@ function BindPlan() {
         numEl.textContent = 'Day ' + (d + 1);
 
         var summEl = document.createElement('span');
-        summEl.className   = 'plan-day-summary';
-        summEl.textContent = summary;
+        summEl.className = 'plan-day-summary';
+        if (isRestDay) {
+            summEl.textContent = 'Day of Rest & Reflection';
+        } else {
+            var mlS = document.createElement('span');
+            mlS.className   = 'lang-ml';
+            mlS.textContent = summaryObj.ml;
+            var sepS = document.createElement('span');
+            sepS.className   = 'lang-sep';
+            sepS.textContent = ' / ';
+            var enS = document.createElement('span');
+            enS.className   = 'lang-en';
+            enS.textContent = summaryObj.en;
+            summEl.appendChild(mlS);
+            summEl.appendChild(sepS);
+            summEl.appendChild(enS);
+        }
 
         var badgeEl = document.createElement('span');
         badgeEl.className = 'plan-day-badge';
@@ -853,10 +1068,17 @@ function BindPlan() {
         var checkboxes = dayCard.querySelectorAll('input[type=checkbox]');
         for (var i = 0; i < checkboxes.length; i++) {
             var inp = checkboxes[i];
+            var markChId = parseInt(inp.value, 10);
             if (inp.checked !== markAll) {
                 inp.checked = markAll;
-                Select_Item(markAll, inp.value, 'id', USL_LST_ATTR);
-                syncCheckboxes(parseInt(inp.value, 10), markAll, inp);
+                Select_Item(markAll, markChId, 'id', USL_LST_ATTR);
+                syncCheckboxes(markChId, markAll, inp);
+            }
+            // Always sync siblings so duplicate chapters stay consistent
+            var markSiblings = getSiblingIds(markChId);
+            for (var mi = 0; mi < markSiblings.length; mi++) {
+                Select_Item(markAll, markSiblings[mi], 'id', USL_LST_ATTR);
+                syncCheckboxes(markSiblings[mi], markAll, null);
             }
         }
 
@@ -894,6 +1116,26 @@ function BindPlan() {
         var chId    = parseInt(inp.value, 10);
         syncCheckboxes(chId, inp.checked, inp);
 
+        // Sync sibling chapters (e.g. Esther duplicate chapters) — OT/NT accordion ONLY.
+        // Do NOT use syncCheckboxes() here: the sibling's storage ID may collide with
+        // a different chapter's plan checkbox value, causing false ticks in the plan.
+        var chSiblings = getSiblingIds(chId);
+        for (var csi = 0; csi < chSiblings.length; csi++) {
+            var sibId = chSiblings[csi];
+            Select_Item(inp.checked, sibId, 'id', USL_LST_ATTR);
+            var sibBoxes = document.querySelectorAll(
+                '#old-accordion input[type=checkbox][value="' + sibId + '"],' +
+                '#new-accordion input[type=checkbox][value="' + sibId + '"]'
+            );
+            for (var sb = 0; sb < sibBoxes.length; sb++) {
+                if (sibBoxes[sb].checked !== inp.checked) {
+                    sibBoxes[sb].checked = inp.checked;
+                    var sibItem = sibBoxes[sb].closest('.book-item');
+                    if (sibItem) updateBookItemStatus(sibItem);
+                }
+            }
+        }
+
         var dayCard = inp.closest('.plan-day');
         if (dayCard) {
             var dayIdx = parseInt(dayCard.dataset.day, 10);
@@ -906,35 +1148,42 @@ function BindPlan() {
                 var tot = allInp.length, rd = 0;
                 for (var i = 0; i < allInp.length; i++) { if (allInp[i].checked) rd++; }
                 var bName = bookSec.querySelector('.plan-book-name');
-                // Update the small label to show sub-progress
-                if (bName && bName.dataset.base) {
-                    bName.textContent = bName.dataset.base + ' (' + rd + '/' + tot + ')';
+                // Update the count span to show sub-progress
+                if (bName) {
+                    var cntEl = bName.querySelector('.plan-book-count');
+                    if (cntEl) cntEl.textContent = ' (' + rd + '/' + tot + ')';
                 }
             }
         }
 
-        var bName2 = (inp.closest('.plan-book-section') && inp.closest('.plan-book-section').querySelector('.plan-book-name') || {}).dataset;
-        var bookLabel = bName2 && bName2.base ? bName2.base : '';
+        var planBookSec = inp.closest('.plan-book-section');
+        var planBookName = planBookSec ? planBookSec.querySelector('.plan-book-name') : null;
+        var lang = document.body.dataset.lang || 'both';
+        var bookLabel = '';
+        if (planBookName) {
+            bookLabel = (lang === 'ml' ? planBookName.dataset.baseMl : planBookName.dataset.baseEn) || planBookName.dataset.baseEn || '';
+        }
         AlertMessage(inp.checked ? 'Success' : 'Info',
             (bookLabel || 'Chapter') + ' Ch.' + (inp.nextElementSibling ? inp.nextElementSibling.textContent : '') +
             (inp.checked ? ' marked as read.' : ' unmarked.'));
     });
 }
 
-// Helper — build readable summary for a day
+// Helper — build readable summary for a day (plain text, lang-aware)
+// Returns { ml: string, en: string }
 function _makeDaySummary(segments) {
-    if (!segments || segments.length === 0) return '';
-    var parts = [];
+    if (!segments || segments.length === 0) return { ml: '', en: '' };
+    var mlParts = [], enParts = [];
     for (var s = 0; s < segments.length; s++) {
-        var seg  = segments[s];
-        var name = _BOOK_NAMES[seg[0]] || '';
-        if (seg[1] === seg[2]) {
-            parts.push(name + ' ' + seg[1]);
-        } else {
-            parts.push(name + ' ' + seg[1] + '-' + seg[2]);
-        }
+        var seg    = segments[s];
+        var catid  = seg[0];
+        var ml     = _BOOK_NAMES_ML[catid] || _BOOK_NAMES[catid] || '';
+        var en     = _BOOK_NAMES[catid]    || '';
+        var chStr  = seg[1] === seg[2] ? seg[1] : seg[1] + '-' + seg[2];
+        mlParts.push(ml + ' ' + chStr);
+        enParts.push(en + ' ' + chStr);
     }
-    return parts.join(' • ');
+    return { ml: mlParts.join(' • '), en: enParts.join(' • ') };
 }
 
 // ==========================================================
@@ -967,8 +1216,9 @@ function BindPlanDayContent(dayIndex, container) {
         var catid    = seg[0];
         var fromCh   = seg[1];
         var toCh     = seg[2];
-        var bookName = _BOOK_NAMES[catid] || 'Book ' + catid;
-        var label    = bookName + ' ' + fromCh + (fromCh !== toCh ? '–' + toCh : '');
+        var chRange  = fromCh + (fromCh !== toCh ? '–' + toCh : '');
+        var labelEN  = (_BOOK_NAMES[catid]    || 'Book ' + catid) + ' ' + chRange;
+        var labelML  = (_BOOK_NAMES_ML[catid] || _BOOK_NAMES[catid] || 'Book ' + catid) + ' ' + chRange;
 
         // Count read in this segment
         var segTotal = toCh - fromCh + 1, segRead = 0;
@@ -981,9 +1231,27 @@ function BindPlanDayContent(dayIndex, container) {
         section.className = 'plan-book-section';
 
         var nameEl = document.createElement('div');
-        nameEl.className      = 'plan-book-name';
-        nameEl.dataset.base   = label;
-        nameEl.textContent    = label + ' (' + segRead + '/' + segTotal + ')';
+        nameEl.className        = 'plan-book-name';
+        nameEl.dataset.baseEn   = labelEN;
+        nameEl.dataset.baseMl   = labelML;
+
+        var mlNameSpan  = document.createElement('span');
+        mlNameSpan.className   = 'lang-ml';
+        mlNameSpan.textContent = labelML;
+        var sepNameSpan = document.createElement('span');
+        sepNameSpan.className   = 'lang-sep';
+        sepNameSpan.textContent = ' / ';
+        var enNameSpan  = document.createElement('span');
+        enNameSpan.className   = 'lang-en';
+        enNameSpan.textContent = labelEN;
+        var cntSpan = document.createElement('span');
+        cntSpan.className   = 'plan-book-count';
+        cntSpan.textContent = ' (' + segRead + '/' + segTotal + ')';
+
+        nameEl.appendChild(mlNameSpan);
+        nameEl.appendChild(sepNameSpan);
+        nameEl.appendChild(enNameSpan);
+        nameEl.appendChild(cntSpan);
 
         var grid = document.createElement('div');
         grid.className = 'chapter-grid';
@@ -998,7 +1266,15 @@ function BindPlanDayContent(dayIndex, container) {
             var inp = document.createElement('input');
             inp.type    = 'checkbox';
             inp.value   = chId;
-            inp.checked = (checkedMap[chId] === 1);
+            // For sibling chapters: checked in plan only when ALL OT copies are read
+            var _chSibs  = getSiblingIds(chId);
+            var _chRead  = (checkedMap[chId] === 1);
+            if (_chRead && _chSibs.length > 0) {
+                for (var _si = 0; _si < _chSibs.length; _si++) {
+                    if (!checkedMap[_chSibs[_si]]) { _chRead = false; break; }
+                }
+            }
+            inp.checked = _chRead;
 
             var box = document.createElement('span');
             box.className   = 'chapter-box';
@@ -1015,6 +1291,111 @@ function BindPlanDayContent(dayIndex, container) {
     }
 
     container.appendChild(frag);
+}
+
+// ==========================================================
+//  Reset reading progress
+// ==========================================================
+function initResetModal() {
+    var btn     = document.getElementById('reset-btn');
+    var modal   = document.getElementById('reset-modal');
+    var cancel  = document.getElementById('reset-cancel');
+    var confirm = document.getElementById('reset-confirm');
+    if (!btn || !modal) return;
+
+    btn.addEventListener('click', function () {
+        modal.hidden = false;
+        cancel.focus();
+    });
+
+    cancel.addEventListener('click', function () {
+        modal.hidden = true;
+    });
+
+    // Close on overlay click (outside the box)
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) modal.hidden = true;
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function (e) {
+        if (!modal.hidden && (e.key === 'Escape' || e.key === 'Esc')) {
+            modal.hidden = true;
+        }
+    });
+
+    confirm.addEventListener('click', function () {
+        modal.hidden = true;
+        doReset();
+    });
+}
+
+function doReset() {
+    // Clear all reading progress keys
+    localStorage.removeItem(OldTestament_LSN);
+    localStorage.removeItem(OldChapters);
+    localStorage.removeItem(NewTestament_LSN);
+    localStorage.removeItem(NewChapters);
+    localStorage.removeItem(PrayerVersion);
+
+    // Invalidate sibling map cache (will rebuild from fresh data)
+    _SIBLING_MAP    = null;
+    _CHAPTER_PRIMARY = null;
+
+    // Re-initialise localStorage with default (all-unread) data
+    Initialize();
+
+    // Re-render OT accordion
+    var otContainer = document.getElementById(USR_LST_ACC);
+    if (otContainer) {
+        otContainer._eventsAttached = false;
+        otContainer.innerHTML = '';
+    }
+    // Re-render NT accordion
+    var ntContainer = document.getElementById(PUR_LST_ACC);
+    if (ntContainer) {
+        ntContainer._eventsAttached = false;
+        ntContainer.innerHTML = '';
+    }
+    BindUserData();
+
+    // Re-render 100-day plan if it was ever opened
+    var planList = document.getElementById('plan-list');
+    if (planList) {
+        planList._planBound = false;
+        planList.innerHTML  = '';
+        // Only re-bind if the plan tab is currently visible
+        if (!document.getElementById('pane-plan').hidden) {
+            BindPlan();
+        }
+    }
+
+    BindDashboard();
+    AlertMessage('Info', 'All reading progress has been reset.');
+}
+
+// ==========================================================
+//  Language switcher
+// ==========================================================
+function initLangToggle() {
+    var saved = localStorage.getItem(LangPref_LSN) || 'both';
+    _applyLang(saved);
+
+    var btns = document.querySelectorAll('.lang-opt[data-lang]');
+    btns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            _applyLang(btn.dataset.lang);
+            localStorage.setItem(LangPref_LSN, btn.dataset.lang);
+        });
+    });
+}
+
+function _applyLang(lang) {
+    document.body.dataset.lang = lang;
+    var btns = document.querySelectorAll('.lang-opt[data-lang]');
+    btns.forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+    });
 }
 
 // ==========================================================
@@ -1057,6 +1438,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (yearEl) yearEl.textContent = new Date().getFullYear();
 
     Initialize();
+    _buildSiblingMap();
+    initLangToggle();
+    initResetModal();
     BindUserData();
     BindDashboard();
     initTabs();
