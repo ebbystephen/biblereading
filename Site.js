@@ -1294,6 +1294,32 @@ function BindPlanDayContent(dayIndex, container) {
 }
 
 // ==========================================================
+//  Day / Night theme toggle
+// ==========================================================
+var ThemePref_LSN = 'theme_pref@$111';
+
+function initThemeToggle() {
+    var saved = localStorage.getItem(ThemePref_LSN) ||
+                (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    _applyTheme(saved);
+
+    var btn = document.getElementById('theme-btn');
+    if (btn) {
+        btn.addEventListener('click', function () {
+            var next = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+            _applyTheme(next);
+            localStorage.setItem(ThemePref_LSN, next);
+        });
+    }
+}
+
+function _applyTheme(theme) {
+    document.body.dataset.theme = theme;
+    var btn = document.getElementById('theme-btn');
+    if (btn) btn.title = theme === 'dark' ? 'Switch to day mode' : 'Switch to night mode';
+}
+
+// ==========================================================
 //  Reset reading progress
 // ==========================================================
 function initResetModal() {
@@ -1439,6 +1465,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     Initialize();
     _buildSiblingMap();
+    initThemeToggle();
     initLangToggle();
     initResetModal();
     BindUserData();

@@ -37,6 +37,104 @@
                       'Helvetica Neue', Arial, 'Noto Sans Malayalam', sans-serif;
 }
 
+/* ── Dark Theme Tokens ─────────────────────────────────── */
+body[data-theme="dark"] {
+    --primary:        #6aabdf;   /* lighter — readable as text on dark bg */
+    --primary-hover:  #82bcec;
+    --accent:         #e0b030;
+    --success:        #2ecc71;
+    --success-bg:     rgba(46,204,113,.10);
+    --warning:        #f0c419;
+    --warning-bg:     rgba(240,196,25,.10);
+    --danger:         #e74c3c;
+    --danger-bg:      rgba(231,76,60,.12);
+    --info:           #5dade2;
+    --info-bg:        rgba(52,152,219,.12);
+
+    --bg:             #0f1923;
+    --card:           #182433;
+    --border:         #253649;
+    --text:           #dde6f0;
+    --text-muted:     #7a95b0;
+    --text-light:     #445a70;
+
+    --shadow-sm:      0 1px 3px rgba(0,0,0,.35);
+    --shadow:         0 2px 8px rgba(0,0,0,.45);
+    --shadow-md:      0 4px 16px rgba(0,0,0,.55);
+}
+
+/* Dark mode component overrides */
+/* ── Navbar ── */
+body[data-theme="dark"] .navbar { background: #0d1827; }
+
+/* ── Toasts — text must be light in dark mode ── */
+body[data-theme="dark"] .toast-success { color: #6ee09a; }
+body[data-theme="dark"] .toast-info    { color: #70bef0; }
+body[data-theme="dark"] .toast-warning { color: #f5d76e; }
+body[data-theme="dark"] .toast-danger  { color: #f1948a; }
+body[data-theme="dark"] #toast-area .toast { box-shadow: 0 4px 16px rgba(0,0,0,.6); }
+
+/* ── Tab bar ── */
+body[data-theme="dark"] .tab-btn:hover  { background: #1e2f42; color: var(--text); }
+body[data-theme="dark"] .tab-btn.active { background: #182433; color: var(--primary); }
+
+/* ── Book accordion headers ── */
+body[data-theme="dark"] .book-header:hover { background: #1e2f42; }
+
+/* Status: left border accent + ultra-subtle tint (professional dark pattern) */
+body[data-theme="dark"] .book-item.status-complete { border-left: 3px solid var(--success); }
+body[data-theme="dark"] .book-item.status-partial  { border-left: 3px solid var(--warning); }
+body[data-theme="dark"] .book-item.status-complete .book-header       { background: rgba(46,204,113,.08); }
+body[data-theme="dark"] .book-item.status-partial  .book-header       { background: rgba(240,196,25,.08); }
+body[data-theme="dark"] .book-item.status-complete .book-header:hover { background: rgba(46,204,113,.15); }
+body[data-theme="dark"] .book-item.status-partial  .book-header:hover { background: rgba(240,196,25,.15); }
+
+/* ── Chapter panel & boxes ── */
+body[data-theme="dark"] .chapter-panel  { background: #111e2c; }
+body[data-theme="dark"] .chapter-box    { background: #1e2f42; color: var(--text-muted); }
+body[data-theme="dark"] .chk_container:hover .chapter-box { background: #2a3f58; color: var(--text); }
+
+/* ── Plan day headers ── */
+body[data-theme="dark"] .plan-day-header:hover { background: #1e2f42; }
+
+/* Status: left border accent + ultra-subtle tint */
+body[data-theme="dark"] .plan-day.day-complete { border-left: 3px solid var(--success); }
+body[data-theme="dark"] .plan-day.day-partial  { border-left: 3px solid var(--warning); }
+body[data-theme="dark"] .plan-day.day-rest     { border-left: 3px solid #9b59b6; }
+body[data-theme="dark"] .plan-day.day-complete .plan-day-header        { background: rgba(46,204,113,.08); }
+body[data-theme="dark"] .plan-day.day-partial  .plan-day-header        { background: rgba(240,196,25,.08); }
+body[data-theme="dark"] .plan-day.day-rest     .plan-day-header        { background: rgba(155,89,182,.08); }
+body[data-theme="dark"] .plan-day.day-complete .plan-day-header:hover  { background: rgba(46,204,113,.15); }
+body[data-theme="dark"] .plan-day.day-partial  .plan-day-header:hover  { background: rgba(240,196,25,.15); }
+body[data-theme="dark"] .plan-day.open         .plan-day-header        { background: #1a2d42; }
+body[data-theme="dark"] .plan-day.day-complete.open .plan-day-header   { background: rgba(46,204,113,.15); }
+body[data-theme="dark"] .plan-day.day-partial.open  .plan-day-header   { background: rgba(240,196,25,.15); }
+
+/* ── Plan day body ── */
+body[data-theme="dark"] .plan-day-body  { background: #111e2c; }
+
+/* ── Dashboard bars ── */
+body[data-theme="dark"] .mini-bar         { background: var(--border); }
+body[data-theme="dark"] .plan-strip-track { background: var(--border); }
+
+/* ── Modal ── */
+body[data-theme="dark"] .modal-box { background: #182433; box-shadow: 0 12px 40px rgba(0,0,0,.7); }
+body[data-theme="dark"] .modal-btn-cancel       { background: #1e2f42; color: var(--text-muted); border-color: var(--border); }
+body[data-theme="dark"] .modal-btn-cancel:hover { background: var(--border); color: var(--text); }
+
+/* ── Language switcher ── */
+body[data-theme="dark"] .lang-switcher { background: rgba(255,255,255,.07); }
+
+/* ── Plan day header text ── */
+body[data-theme="dark"] .plan-day-summary { color: #a8c4d8; }   /* brighter than --text-muted */
+body[data-theme="dark"] .plan-book-name   { color: #82bcec; border-bottom-color: var(--border); }
+
+/* ── Badges — keep dark bg with white text even though --primary is now light ── */
+body[data-theme="dark"] .book-badge       { background: #2d5a8e; color: #fff; }
+body[data-theme="dark"] .plan-day-badge   { background: #2d5a8e; color: #fff; }
+body[data-theme="dark"] .book-item.status-partial .book-badge   { background: var(--warning); color: #1a1a00; }
+body[data-theme="dark"] .plan-day.day-partial .plan-day-badge   { background: var(--warning); color: #1a1a00; }
+
 /* ── Reset & Base ──────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -266,12 +364,12 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
-.tab-btn:hover { background: #f5f8fc; color: var(--primary); }
+.tab-btn:hover { background: #f0f4fa; color: var(--primary); }
 
 .tab-btn.active {
     color: var(--primary);
     border-bottom-color: var(--accent);
-    background: #f8fafc;
+    background: #f5f8fc;
 }
 
 /* ── Tab Panes ─────────────────────────────────────────── */
@@ -310,7 +408,7 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
-.book-header:hover { background: #f5f8fc; }
+.book-header:hover { background: #f0f4fa; }
 
 /* Status colors on the book header */
 .book-item.status-complete .book-header { background: var(--success-bg); }
@@ -557,7 +655,7 @@ body {
     -webkit-tap-highlight-color: transparent;
     min-height: 48px;
 }
-.plan-day-header:hover { background: #f5f8fc; }
+.plan-day-header:hover { background: #f0f4fa; }
 
 /* Status tints */
 .plan-day.day-complete .plan-day-header { background: var(--success-bg); }
@@ -685,6 +783,28 @@ body {
     .plan-day-header  { padding: 10px 12px; gap: 6px; }
     .plan-day-num     { min-width: 36px; font-size: .7rem; }
 }
+
+/* ── Theme Toggle Button (navbar) ─────────────────────── */
+.theme-nav-btn {
+    margin-left: 10px;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,.55);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color .2s, background .2s;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+}
+.theme-nav-btn:hover { color: var(--accent); background: rgba(255,255,255,.10); }
+
+/* Show moon in light mode, sun in dark mode */
+body:not([data-theme="dark"]) .icon-sun { display: none; }
+body[data-theme="dark"]       .icon-moon { display: none; }
 
 /* ── Reset Button (navbar) ─────────────────────────────── */
 .reset-nav-btn {
